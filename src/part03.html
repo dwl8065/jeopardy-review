@@ -227,6 +227,10 @@ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().cat
   apply();
 })();
 
+// ---------- Play layout: scores on top, controls at the bottom ----------
+$("playView").insertBefore($("scores"),$("board"));
+$("playView").after($("playTools"));
+
 soundLabel(); showView("lib"); renderLib();
 </script>
 <style>
@@ -244,6 +248,10 @@ th,td{padding:.4em .8em}
 .media svg{width:min(100%,calc(var(--qscale) * 560px))}
 #revealBtn{font-size:clamp(1rem,1.4vw,1.3rem);padding:12px 22px}
 .sizeBtns .btn{min-width:52px;font-size:1.05rem}
+#playView:not(.hidden){flex:1;display:flex;flex-direction:column;gap:14px}
+#scores{margin:0 !important}
+.board{grid-template-rows:auto repeat(5,minmax(0,1fr))}
+#playTools{border-top:3px solid var(--accent);padding-top:12px;justify-content:center}
 </style>
 </body>
 </html>
