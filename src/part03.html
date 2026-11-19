@@ -230,6 +230,8 @@ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().cat
 // ---------- Play layout: scores on top, controls at the bottom ----------
 $("playView").insertBefore($("scores"),$("board"));
 $("playView").after($("playTools"));
+// Timer sits in the top center of the question screen (clear of the Promethean screen-share box)
+(function(){const top=document.querySelector(".q-top"); top.insertBefore($("timer"),top.children[1]);})();
 
 soundLabel(); showView("lib"); renderLib();
 </script>
@@ -253,7 +255,11 @@ th,td{padding:.4em .8em}
 .board{grid-template-rows:auto repeat(5,minmax(0,1fr))}
 #playTools{border-top:3px solid var(--accent);padding-top:12px;justify-content:center}
 .timer{font-size:clamp(2.6rem,5.2vw,5.4rem);line-height:1;min-width:2.4ch;text-align:center;padding:.08em .3em;border:4px solid var(--line);border-radius:14px;background:var(--panel);font-variant-numeric:tabular-nums}
-.timer:empty{display:none}
+.timer:empty{visibility:hidden;border-color:transparent;background:none}
+.q-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:12px}
+.q-top>.timer{justify-self:center;align-self:start}
+.q-top>.row{justify-content:flex-end}
+@media (max-width:760px){.q-top{grid-template-columns:1fr}.q-top>.timer{order:-1}.q-top>.row{justify-content:flex-start}}
 .timer.low{border-color:var(--accent);animation:tpulse 1s ease-in-out infinite}
 @keyframes tpulse{50%{transform:scale(1.08)}}
 @media (prefers-reduced-motion: reduce){.timer.low{animation:none}}
