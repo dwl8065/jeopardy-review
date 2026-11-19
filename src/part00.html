@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jeopardy Review</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#002D6C">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FFFFFF; --grid:#EEF1F6; --grid-strong:#DFE4EC;
+  --ink:#002D6C; --ink-soft:#4D6390;
+  --tile-bg:#002D6C; --tile-fg:#FFFFFF; --tile-shadow:#C51230; --tile-used:rgba(0,45,108,.05);
+  --panel:#FFFFFF; --accent:#C51230; --ok:#002D6C; --line:#002D6C;
+  --display:"Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+  --text:"Atkinson Hyperlegible", Verdana, system-ui, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --paper:#011B48; --grid:#06245A; --grid-strong:#0D3070;
+    --ink:#FFFFFF; --ink-soft:#A5B4CB;
+    --tile-bg:#002D6C; --tile-fg:#FFFFFF; --tile-shadow:#C51230; --tile-used:rgba(255,255,255,.04);
+    --panel:#002D6C; --accent:#F0546B; --ok:#DFE4EC; --line:#DFE4EC;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#011B48; --grid:#06245A; --grid-strong:#0D3070;
+  --ink:#FFFFFF; --ink-soft:#A5B4CB;
+  --tile-bg:#002D6C; --tile-fg:#FFFFFF; --tile-shadow:#C51230; --tile-used:rgba(255,255,255,.04);
+  --panel:#002D6C; --accent:#F0546B; --ok:#DFE4EC; --line:#DFE4EC;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%}
+body{
+  margin:0; min-height:100%;
+  font-family:var(--text); color:var(--ink);
+  background-color:var(--paper);
+  background-image:
+    linear-gradient(var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:100px 100px,100px 100px,20px 20px,20px 20px;
+}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.wrap{max-width:1400px;margin:0 auto;padding:16px clamp(10px,2vw,28px) 24px;display:flex;flex-direction:column;gap:16px;min-height:100vh}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(1.6rem,3.4vw,2.8rem);line-height:1;margin:0;letter-spacing:-.02em}
+h1 small{display:block;font-family:var(--text);font-weight:400;font-size:clamp(.85rem,1.2vw,1rem);color:var(--ink-soft);margin-top:6px;letter-spacing:0}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.btn{background:transparent;border:2px solid var(--line);border-radius:8px;padding:8px 14px;font-weight:700;font-size:.95rem}
+.btn:hover{background:var(--tile-used)}
+.btn.solid{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.final{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* Board */
+.board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:clamp(5px,.8vw,10px);flex:1}
+.cat{font-family:var(--display);font-weight:800;text-align:center;font-size:clamp(.8rem,1.5vw,1.25rem);line-height:1.1;padding:10px 6px;border-bottom:4px solid var(--accent);display:flex;flex-direction:column;justify-content:flex-end;min-height:72px}
+.cat span{font-family:var(--text);font-weight:400;font-size:.72em;color:var(--ink-soft);margin-top:4px}
+.tile{background:var(--tile-bg);color:var(--tile-fg);border:none;border-radius:6px;font-family:var(--display);font-weight:800;font-size:clamp(1.4rem,3.6vw,3rem);min-height:clamp(58px,11vh,120px);box-shadow:0 3px 0 #011B48;text-shadow:2px 2px 0 var(--tile-shadow);border:2px solid #011B48;transition:transform .12s}
+.tile:hover{transform:translateY(-2px)}
+.tile.used{background:var(--tile-used);color:var(--ink-soft);opacity:.45;text-shadow:none;box-shadow:none;border:2px dashed var(--grid-strong);cursor:default;transform:none}
+
+/* Scores */
+.scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.team{background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.team input{font:inherit;font-weight:700;background:transparent;border:none;border-bottom:1px dashed var(--ink-soft);color:var(--ink);width:100%;padding:2px 0}
+.score{font-family:var(--display);font-weight:800;font-size:clamp(1.6rem,3vw,2.4rem);line-height:1}
+.score.neg{color:var(--accent)}
+.adj{display:flex;gap:6px}
+.adj button{flex:1;border:1px solid var(--ink-soft);background:transparent;border-radius:6px;padding:3px 0;font-size:.85rem}
+
+/* Question view */
+.overlay{position:fixed;inset:0;background:var(--paper);display:none;z-index:20;overflow:auto;
+  padding:calc(env(safe-area-inset-top,0px) + 16px) clamp(12px,3vw,40px) calc(env(safe-area-inset-bottom,0px) + 20px)}
+.overlay.open{display:block}
+.q-wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.q-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.q-tag{font-weight:700;color:var(--ink-soft)}
+.q-tag b{font-family:var(--display);color:var(--ink);font-size:1.3em;margin-left:6px}
+.q-text{font-size:clamp(1.3rem,2.7vw,2.25rem);line-height:1.35;margin:0}
+.media{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.media svg{width:min(100%,520px);height:auto;background:var(--panel);border:2px solid var(--line);border-radius:8px}
+.tbl-wrap{overflow-x:auto;max-width:100%}
+table{border-collapse:collapse;font-size:clamp(1rem,1.8vw,1.35rem);background:var(--panel)}
+th,td{border:2px solid var(--line);padding:8px 14px;text-align:center}
+th{text-align:left;font-weight:700}
+.answer{background:var(--panel);border-left:8px solid var(--ok);border-radius:8px;padding:16px 20px;display:none}
+.answer.show{display:block;animation:pop .25s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.answer h3{margin:0 0 8px;font-family:var(--display);font-size:clamp(1.3rem,2.6vw,2rem);color:var(--ok)}
+.answer p{margin:6px 0;font-size:clamp(1.05rem,2vw,1.5rem);line-height:1.45}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.timer{font-family:var(--display);font-weight:800;font-size:1.6rem;min-width:3ch;text-align:right}
+.timer.low{color:var(--accent)}
+.award{display:none;flex-direction:column;gap:8px}
+.award.show{display:flex}
+.award .teamrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.award .teamrow strong{min-width:9ch}
+.award button{border:2px solid var(--line);background:transparent;border-radius:8px;padding:6px 14px;font-weight:700}
+.award button.yes{border-color:var(--ok);color:var(--ok)}
+.award button.no{border-color:var(--accent);color:var(--accent)}
+.award button.picked{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.splash{font-family:var(--display);font-weight:800;color:var(--accent);font-size:clamp(2.6rem,9vw,7rem);line-height:.95;margin:4vh 0 0;letter-spacing:-.03em}
+.wager{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:1.15rem}
+.wager input,.wager select{font:inherit;padding:6px 10px;border:2px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);max-width:180px}
+.note{color:var(--ink-soft);font-size:.95rem;margin:0}
+.secs{font:inherit;font-weight:700;width:5.5ch;padding:6px 6px;border:2px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);text-align:center}
+.hidden{display:none !important}
+@media (prefers-reduced-motion: reduce){.tile,.answer.show{transition:none;animation:none}}
+</style>
+</head>
+<body>
+<style>
+.view.hidden{display:none}
+.editor{display:flex;flex-direction:column;gap:14px;padding-bottom:40px}
+.ed-bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:3px solid var(--accent);padding:10px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ed-bar .status{color:var(--ink-soft);font-weight:700;margin-left:4px}
+.ed-help{background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:12px 16px;margin:0;line-height:1.5}
+.ed-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:.95rem}
+.field input[type=text],.field textarea{font:inherit;font-weight:400;font-size:1rem;color:var(--ink);background:var(--panel);border:2px solid var(--grid-strong);border-radius:8px;padding:8px 10px;width:100%}
+.field input[type=text]:focus,.field textarea:focus{border-color:var(--line);outline:none}
+.field textarea{resize:vertical;min-height:70px;line-height:1.4}
+.field small{font-weight:400;color:var(--ink-soft)}
+details.cat-ed{background:var(--panel);border:2px solid var(--line);border-radius:10px}
+details.cat-ed>summary{cursor:pointer;padding:12px 16px;font-family:var(--display);font-weight:800;font-size:1.2rem;list-style:none;display:flex;justify-content:space-between;gap:10px}
+details.cat-ed>summary::after{content:"Edit ▾";font-family:var(--text);font-size:.85rem;color:var(--ink-soft);font-weight:700}
+details.cat-ed[open]>summary::after{content:"Close ▴"}
+.cat-body{padding:0 16px 16px;display:flex;flex-direction:column;gap:14px}
+.qcard{border-top:2px dashed var(--grid-strong);padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.qcard h4{margin:0;font-family:var(--display);font-size:1.3rem;color:var(--accent)}
+.check{display:flex;gap:8px;align-items:center;font-weight:700}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+.tbl-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;padding:10px;border-left:4px solid var(--grid-strong)}
+.tbl-fields.off{display:none}
+.warn{color:var(--accent);font-weight:700;min-height:1em;margin:0}
+.preview-link{align-self:flex-start}
+</style>
+<style>
+.lib{display:flex;flex-direction:column;gap:16px}
+.crumbs{display:flex;gap:4px;flex-wrap:wrap;align-items:center;font-weight:700;color:var(--ink-soft)}
+.crumbs button{border:none;background:none;color:var(--ink);text-decoration:underline;text-underline-offset:3px;padding:6px 4px;font-weight:700}
+.lib-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.lib-head h2{font-family:var(--display);font-weight:800;font-size:clamp(1.6rem,3.2vw,2.4rem);margin:0;letter-spacing:-.02em}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.card{background:var(--tile-bg);color:#fff;border:2px solid #011B48;border-radius:12px;padding:18px;text-align:left;min-height:128px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;box-shadow:0 4px 0 var(--tile-shadow)}
+.card b{font-family:var(--display);font-weight:800;font-size:1.4rem;line-height:1.15}
+.card span{opacity:.85;font-size:.95rem}
+.card.add{background:transparent;color:var(--ink);border:2px dashed var(--line);box-shadow:none;align-items:center;justify-content:center;font-weight:700;font-size:1.05rem}
+.games{display:flex;flex-direction:column;gap:10px}
+.game-row{background:var(--panel);border:2px solid var(--line);border-left:8px solid var(--accent);border-radius:12px;padding:14px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.game-row .meta b{font-family:var(--display);font-weight:800;font-size:1.3rem;display:block}
+.game-row .meta span{color:var(--ink-soft);font-size:.92rem}
+.empty{color:var(--ink-soft);padding:24px;border:2px dashed var(--grid-strong);border-radius:12px;text-align:center;margin:0;line-height:1.5}
+.lib-foot{border-top:2px solid var(--grid-strong);padding-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.dlg{position:fixed;inset:0;background:rgba(1,27,72,.55);display:none;align-items:center;justify-content:center;z-index:40;padding:16px}
+.dlg.open{display:flex}
+.dlg-box{background:var(--paper);color:var(--ink);border:3px solid var(--line);border-radius:14px;padding:20px;width:min(480px,100%);display:flex;flex-direction:column;gap:14px}
+.dlg-box h3{margin:0;font-family:var(--display);font-size:1.5rem}
+.dlg-box select{font:inherit;padding:8px 10px;border:2px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);width:100%}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:999px;font-weight:700;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+.btn{min-height:44px}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1 id="gTitle"></h1>
+    <div class="tools" id="libTools">
+      <button class="btn final hidden" id="installBtn">Install app</button>
+      <button class="btn soundBtn">Sound: on</button>
+      <button class="btn themeBtn">Switch light/dark</button>
+    </div>
+    <div class="tools hidden" id="playTools">
+      <button class="btn solid" id="libBtn">← Library</button>
+      <button class="btn" id="editBtn">Edit questions</button>
+      <button class="btn final" id="finalBtn">Final Jeopardy</button>
+      <button class="btn" id="fsBtn">Full screen</button>
+      <button class="btn" id="addTeam">Add team</button>
+      <button class="btn" id="removeTeam">Remove team</button>
+      <button class="btn soundBtn">Sound: on</button>
+      <button class="btn themeBtn">Switch light/dark</button>
+      <button class="btn" id="resetBtn">New game</button>
+    </div>
+  </header>
+
+  <div class="view lib" id="libView"></div>
+
+  <div class="view hidden" id="playView">
+    <main class="board" id="board" aria-label="Game board"></main>
+    <section class="scores" id="scores" aria-label="Team scores" style="margin-top:16px"></section>
+  </div>
+
+  <div class="view hidden editor" id="editView">
+    <div class="ed-bar">
+      <button class="btn solid" id="doneBtn">Done</button>
+      <button class="btn" id="playFromEdit">Play this game</button>
+      <button class="btn" id="saveFileBtn">Download game file</button>
+      <button class="btn" id="blankBtn">Erase all questions</button>
+      <span class="status" id="status" aria-live="polite"></span>
+    </div>
+    <p class="ed-help">Changes save automatically on this device. Use <b>Download game file</b> if you want a copy to keep in Google Drive or share with another teacher.</p>
+    <div class="ed-grid">
+      <label class="field">Game title<input type="text" data-top="title"></label>
+      <label class="field">Subtitle<input type="text" data-top="subtitle"></label>
+    </div>
+    <div id="catEditors" style="display:flex;flex-direction:column;gap:12px"></div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".json,application/json" hidden>
+
+<div class="dlg" id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+  <div class="dlg-box">
+    <h3 id="dlgTitle"></h3>
