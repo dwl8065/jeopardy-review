@@ -1,0 +1,161 @@
+    <label class="field"><span id="dlgLabel"></span><input type="text" id="dlgInput"><select id="dlgSelect"></select></label>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn" id="dlgCancel">Cancel</button>
+      <button class="btn solid" id="dlgOk">OK</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="qText" tabindex="-1">
+  <div class="q-wrap">
+    <div class="q-top">
+      <div class="q-tag" id="qTag"></div>
+      <div class="row">
+        <label for="timerSecs">Timer</label><input id="timerSecs" class="secs" type="number" min="5" max="600" step="5" value="30"><span class="note">sec</span>
+        <button class="btn" id="timerBtn">Start timer</button>
+        <button class="btn" id="timerReset">Reset</button>
+        <span class="timer" id="timer" aria-live="polite"></span>
+        <button class="btn" id="closeBtn">Back to board</button>
+      </div>
+    </div>
+    <div id="ddStage" class="hidden">
+      <p class="splash">Daily Double!</p>
+      <div class="wager">
+        <label for="ddTeam">Team</label><select id="ddTeam"></select>
+        <label for="ddWager">Wager</label><input id="ddWager" type="number" min="0" step="100" value="500">
+        <button class="btn solid" id="ddGo">Show the question</button>
+      </div>
+      <p class="note" id="ddNote"></p>
+    </div>
+    <div id="finalStage" class="hidden">
+      <p class="splash">Final Jeopardy</p>
+      <p class="q-text" id="finalCat"></p>
+      <p class="note">Each team writes down a wager (from 0 up to its score) before seeing the question.</p>
+      <div id="finalWagers" class="award show"></div>
+      <div class="row"><label for="finalSecs">Final timer</label><input id="finalSecs" class="secs" type="number" min="5" max="600" step="5" value="60"><span class="note">sec</span><button class="btn solid" id="finalGo">Show the question</button></div>
+    </div>
+    <div id="qStage">
+      <p class="q-text" id="qText"></p>
+      <div class="media" id="qMedia"></div>
+      <div class="row"><button class="btn solid" id="revealBtn">Show answer</button><span class="note">or press the space bar</span></div>
+      <div class="answer" id="answer"></div>
+      <div class="award" id="award"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const VALUES=[100,200,300,400,500];
+const KEY="jq-app", LKEY="jq-library-v1";
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+// ---------- Game data ----------
+function T(on,xLabel,x,yLabel,y,graph){return {on,xLabel,x,yLabel,y,graph}}
+const NOTABLE=()=>T(false,"","","","",false);
+function Q(q,a,steps,table){return {q,a,steps:steps.join("\n"),table:table||NOTABLE()}}
+const KITE=()=>T(true,"t (seconds)","0, 3, 6, 9, 12","K(t) (feet)","0, 15, 15, 24, 6",true);
+const KITE_INTRO="The table and graph show K(t), a kite’s height in feet, t seconds after it starts to rise. ";
+const PLANTS="Two plants’ heights, in cm, after w weeks are Plant 1: P(w) = 5 + 0.5w and Plant 2: Q(w) = 4 + 0.75w. ";
+const SAMPLE={
+ title:"Unit 8 Review: Functions", subtitle:"Integrated Math 1, Lessons 6–9",
+ cats:[
+  {name:"Features of Graphs", lesson:"Lesson 6", qs:[
+   Q("Function h gives a ball’s height, in meters, t seconds after it’s tossed. Its graph starts at (0, 20), rises to (1, 25), and reaches the ground at (3.2, 0). What is the point (0, 20) called, and what does it tell us?","The vertical intercept.",["It tells us the ball starts at 20 meters when t = 0. In function notation: h(0) = 20."]),
+   Q(KITE_INTRO+"On what interval is K constant? What is the kite doing then?","From t = 3 to t = 6 seconds.",["The kite stays at 15 feet. The output doesn’t change, so the graph is flat."],KITE()),
+   Q(KITE_INTRO+"What is the maximum value of K, and what does it mean in this situation?","24 feet.",["The greatest height the kite reaches is 24 feet, and it happens at 9 seconds. The maximum value is the output (24), not the time."],KITE()),
+   Q("Function h gives a ball’s height, in meters, t seconds after it’s tossed. Its graph has a horizontal intercept at (3.2, 0). In that point, is the 0 an input or an output? What does the point tell us about the ball?","The 0 is an output.",["The function’s value is 0 at that input. For the ball, h(3.2) = 0: it hits the ground 3.2 seconds after being tossed."]),
+   Q(KITE_INTRO+"Write “When is the kite 20 feet high?” in function notation. Then find every time it happens.","K(t) = 20, at about t ≈ 7.7 s and t ≈ 9.7 s.",["From 6 to 9 s the kite rises 9 ft in 3 s (3 ft per second). Going from 15 to 20 ft takes 5 ÷ 3 ≈ 1.7 s, so t ≈ 7.7.","From 9 to 12 s it falls 18 ft in 3 s (6 ft per second). Going from 24 to 20 ft takes 4 ÷ 6 ≈ 0.7 s, so t ≈ 9.7.","Watch out: 20 isn’t in the table, but the graph still passes through it twice."],KITE())
+  ]},
+  {name:"Average Rate of Change", lesson:"Lesson 7", qs:[
+   Q("How is the average rate of change of a function between two points related to the slope of a line? When is the average rate of change the same on every interval?","It’s the slope of the line connecting the two points. It’s the same on every interval only for a linear function.",["Both are change in output ÷ change in input: [ f(b) − f(a) ] ÷ (b − a).","A line has one constant slope, so its average rate of change is the same no matter which two points you pick.","For a curve (not linear), the average rate of change depends on which interval you choose."]),
+   Q("The temperature was 35 °F at 9 a.m. and 45 °F at 2 p.m. What was the average rate of change? Include units.","2 °F per hour.",["(45 − 35) ÷ (2 p.m. − 9 a.m.) = 10 ÷ 5 = 2. On average, the temperature rose 2 °F each hour, even though it didn’t rise the same amount every hour."]),
+   Q("On a winter day, the temperature was 45 °F at 2 p.m. and 30 °F at 8 p.m. Find the average rate of change and explain what the sign means.","−2.5 °F per hour.",["(30 − 45) ÷ (8 − 2) = −15 ÷ 6 = −2.5.","The negative sign means the temperature was decreasing: on average it dropped 2.5 °F per hour."]),
+   Q("W(t) is the water in a bucket, in liters, after t minutes. Which interval has the greater rate of change in magnitude: 0 to 4 minutes, or 4 to 10 minutes?","0 to 4 minutes.",["0 to 4: (18 − 2) ÷ (4 − 0) = 16 ÷ 4 = 4 liters per minute.","4 to 10: (9 − 18) ÷ (10 − 4) = −9 ÷ 6 = −1.5 liters per minute.","Compare sizes: 4 is bigger than 1.5, so the water was filling faster than it was draining."],T(true,"t (minutes)","0, 4, 10","W(t) (liters)","2, 18, 9",false)),
+   Q("A plant’s height H(w), in cm, after w weeks: H(3) = 11 and H(7) = 21. A student wrote (7 − 3) ÷ (21 − 11) = 0.4 cm per week. Find the mistake and give the correct rate.","2.5 cm per week.",["The student divided input change by output change, which is upside down.","Correct: (21 − 11) ÷ (7 − 3) = 10 ÷ 4 = 2.5 cm per week. Outputs go on top."])
+  ]},
+  {name:"Interpreting & Creating Graphs", lesson:"Lesson 8", qs:[
+   Q("On a graph of a person’s distance from home over time, what does a horizontal segment mean?","The person stopped moving.",["The distance from home isn’t changing for that stretch of time, so the output stays the same and the graph is flat."]),
+   Q("A flag starts on the ground and is raised at a steady rate to 10 meters in 2 minutes. Describe that piece of the graph and find the rate.","A straight line rising from (0, 0) to (2, 10), at 5 meters per minute.",["Steady rate means a straight segment. 10 ÷ 2 = 5 meters per minute."]),
+   Q("A child tosses a baseball up. On the way down, it gets stuck in a tree for several seconds, then falls to the ground. Describe the shape of the height graph.","Up, down, flat (not at zero), then down to zero.",["It rises, starts falling, stays constant while stuck in the tree (height above 0), then falls until the height is 0."]),
+   Q("A graph of height versus time contains the points (3, 5) and (3, 11). Does it show height as a function of time? Explain using inputs and outputs.","No.",["The input t = 3 has two different outputs, 5 and 11. A function can give only one output for each input."]),
+   Q("A hiker walks away from the trailhead at a steady pace, rests, jogs farther, then walks back to the trailhead more slowly. A student’s distance-from-trailhead graph ends with a segment going up. What should the last segment look like, and why?","It should go down to 0, and be less steep than the jogging segment.",["Walking back toward the trailhead makes the distance decrease until it reaches 0.","Walking back is slower than jogging, so the slope’s magnitude is smaller."])
+  ]},
+  {name:"Comparing Functions", lesson:"Lesson 9", qs:[
+   Q(PLANTS+"Which plant is taller after 2 weeks?","Plant 1.",["P(2) = 5 + 0.5(2) = 6 cm and Q(2) = 4 + 0.75(2) = 5.5 cm. So P(2) > Q(2)."]),
+   Q(PLANTS+"Write an equation in function notation for when the plants are the same height, then solve it.","P(w) = Q(w), so w = 4 weeks (both 7 cm).",["5 + 0.5w = 4 + 0.75w → 1 = 0.25w → w = 4.","P(4) = 5 + 2 = 7 cm. On a graph, this is where the two lines intersect: (4, 7)."]),
+   Q(PLANTS+"Which plant grows faster, and by how much each week?","Plant 2, by 0.25 cm per week.",["The rates are the coefficients of w: 0.75 vs. 0.5 cm per week. 0.75 − 0.5 = 0.25.","The starting height (5 vs. 4) does not decide which grows faster."]),
+   Q("C(x) and T(x) give the populations of California and Texas, in millions, in year x. Their graphs intersect at about (1935, 5). What does C(1935) = T(1935) mean?","In about 1935, both states had the same population, about 5 million people.",["An intersection point is where both functions have the same output for the same input."]),
+   Q(PLANTS+"For what values of w is Q(w) > P(w)? What does that mean?","w > 4.",["4 + 0.75w > 5 + 0.5w → 0.25w > 1 → w > 4.","After 4 weeks, Plant 2 is taller than Plant 1."])
+  ]},
+  {name:"Function Notation in Context", lesson:"Lessons 6–9", qs:[
+   Q("H(t) is a drone’s height, in meters, t seconds after launch. What does H(6) = 2 mean?","6 seconds after launch, the drone is 2 meters high.",["The number inside the parentheses is the input (time). The number after the equal sign is the output (height)."]),
+   Q("Function h gives a ball’s height in meters after t seconds. Which notation asks “When is the ball 15 meters high?”: h(15) or h(t) = 15?","h(t) = 15.",["15 is a height, so it’s an output. h(15) would ask for the height at 15 seconds."]),
+   Q("A streaming plan costs S(m) = 12 + 0.10m dollars for m minutes of premium content. Find S(50) and explain what it means.","S(50) = 17.",["12 + 0.10(50) = 12 + 5 = 17. Watching 50 minutes costs $17 for the month."]),
+   Q("An ant moves at a steady rate. A student graphs its distance in millimeters against time in years, and the graph looks almost vertical. The student says it’s not a function. Agree or disagree?","Disagree. It’s still a function.",["Axis scales change how steep a graph looks, not whether it’s a function.","Each time input still has exactly one distance output."]),
+   Q("Ride company A charges A(m) = 4 + 1.5m dollars for m miles. Company B charges B(m) = 1.5 + 2m. At how many miles do they cost the same, and which is cheaper for longer rides?","5 miles ($11.50). Company A is cheaper beyond 5 miles.",["4 + 1.5m = 1.5 + 2m → 2.5 = 0.5m → m = 5. A(5) = 4 + 7.5 = 11.50.","Company A has the smaller rate ($1.50 per mile), so it pulls ahead on longer rides. Check: A(8) = $16, B(8) = $17.50."])
+  ]}
+ ],
+ final:{cat:"Comparing Functions",
+  q:"A gym offers two monthly plans. Plan G: G(v) = 20 + 3v. Plan F: F(v) = 35 + 1.5v, where v is the number of visits. For what values of v is G(v) > F(v)? What should someone who goes to the gym a lot choose?",
+  a:"v > 10. Frequent gym-goers should choose Plan F.",
+  steps:"20 + 3v > 35 + 1.5v → 1.5v > 15 → v > 10.\nWith more than 10 visits a month, Plan G costs more, so Plan F is the better deal. At exactly 10 visits, both cost $50."}
+};
+function blankGame(){
+  return {title:"Review Jeopardy", subtitle:"Unit __, Lessons __",
+    cats:[1,2,3,4,5].map(i=>({name:"Category "+i, lesson:"", qs:VALUES.map(()=>Q("","",[]))})),
+    final:{cat:"",q:"",a:"",steps:""}};
+}
+function str(v){return typeof v==="string"?v:(Array.isArray(v)?v.join("\n"):(v==null?"":String(v)))}
+function normalize(g){
+  if(!g||typeof g!=="object"||!Array.isArray(g.cats)) return null;
+  const out=blankGame();
+  out.title=str(g.title)||out.title; out.subtitle=str(g.subtitle);
+  for(let c=0;c<5;c++){
+    const sc=g.cats[c]||{}; out.cats[c].name=str(sc.name)||out.cats[c].name; out.cats[c].lesson=str(sc.lesson);
+    for(let r=0;r<5;r++){
+      const sq=(sc.qs||[])[r]||{}, t=sq.table||{};
+      out.cats[c].qs[r]={q:str(sq.q),a:str(sq.a),steps:str(sq.steps),
+        table:{on:!!t.on,xLabel:str(t.xLabel),x:str(t.x),yLabel:str(t.yLabel),y:str(t.y),graph:!!t.graph}};
+    }
+  }
+  const f=g.final||{}; out.final={cat:str(f.cat),q:str(f.q),a:str(f.a),steps:str(f.steps)};
+  return out;
+}
+
+
+// ---------- Library storage ----------
+function seedLib(){
+  return {courses:[{id:uid(),name:"Algebra 1",units:[{id:uid(),name:"Book 8: Functions",games:[{id:uid(),updated:Date.now(),game:normalize(SAMPLE)}]}]}]};
+}
+let LIB=null; try{LIB=JSON.parse(localStorage.getItem(LKEY))}catch(e){}
+if(!LIB||!Array.isArray(LIB.courses)) LIB=seedLib();
+let libT=null;
+function writeLib(){try{localStorage.setItem(LKEY,JSON.stringify(LIB))}catch(e){toast("Couldn’t save. This device’s storage may be full.")}}
+function saveLib(now){clearTimeout(libT); if(now) writeLib(); else libT=setTimeout(writeLib,300);}
+writeLib();
+const findCourse=id=>LIB.courses.find(c=>c.id===id);
+const findUnit=(c,id)=>c?c.units.find(u=>u.id===id):null;
+function findEntry(id){for(const c of LIB.courses)for(const u of c.units){const e=u.games.find(g=>g.id===id); if(e) return {c,u,e};} return null;}
+
+let nav={c:null,u:null}, view="lib", editReturn="lib";
+let ENTRY=null, GAME=null, S=null;
+function saveGame(){if(ENTRY){ENTRY.updated=Date.now(); saveLib();}}
+
+// ---------- Play state (per game) ----------
+function teamNames(){try{const n=JSON.parse(localStorage.getItem(KEY+"-teams")); if(Array.isArray(n)&&n.length) return n;}catch(e){} return ["Team 1","Team 2","Team 3","Team 4"];}
+function freshState(names){
+  const pool=[]; for(let c=0;c<5;c++) for(let r=1;r<5;r++) pool.push(c+"-"+r);
+  const dd=[]; while(dd.length<2){const p=pool[Math.floor(Math.random()*pool.length)]; if(!dd.includes(p)&&!dd.some(d=>d[0]===p[0])) dd.push(p);}
+  return {teams:(names||teamNames()).map(n=>({name:n,score:0})), used:{}, dd};
+}
+function loadPlay(id){try{const s=JSON.parse(localStorage.getItem("jq-play-"+id)); if(s&&Array.isArray(s.teams)) return s;}catch(e){} return freshState();}
+function save(){
+  if(!ENTRY||!S) return;
+  try{localStorage.setItem("jq-play-"+ENTRY.id,JSON.stringify(S)); localStorage.setItem(KEY+"-teams",JSON.stringify(S.teams.map(t=>t.name)));}catch(e){}
+}
+try{const th=localStorage.getItem(KEY+"-theme"); if(th) document.documentElement.dataset.theme=th;}catch(e){}
+
+function renderTitle(){
