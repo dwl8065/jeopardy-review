@@ -214,7 +214,36 @@ $("installBtn").onclick=async()=>{if(!deferredPrompt) return; deferredPrompt.pro
 if("serviceWorker" in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register("./sw.js").catch(()=>{});
 if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
 
+// ---------- Big-screen question view ----------
+(function(){
+  const row=document.querySelector(".q-top .row");
+  const box=document.createElement("span"); box.className="row sizeBtns";
+  box.innerHTML='<span class="note">Text size</span><button class="btn" id="txtDown" aria-label="Smaller text">A−</button><button class="btn" id="txtUp" aria-label="Bigger text">A+</button>';
+  row.insertBefore(box,row.firstChild);
+  let qs=1.3; try{const v=parseFloat(localStorage.getItem(KEY+"-qscale")); if(v>0) qs=v;}catch(e){}
+  const apply=()=>{document.documentElement.style.setProperty("--qscale",qs); try{localStorage.setItem(KEY+"-qscale",String(qs))}catch(e){}};
+  $("txtDown").onclick=()=>{qs=Math.max(0.8,+(qs-0.15).toFixed(2)); apply();};
+  $("txtUp").onclick=()=>{qs=Math.min(2.4,+(qs+0.15).toFixed(2)); apply();};
+  apply();
+})();
+
 soundLabel(); showView("lib"); renderLib();
 </script>
+<style>
+:root{--qscale:1.3}
+.overlay.open{display:flex;flex-direction:column}
+.q-wrap{max-width:1600px;width:100%;flex:1;display:flex;flex-direction:column;gap:18px}
+#qStage:not(.hidden),#ddStage:not(.hidden),#finalStage:not(.hidden){flex:1;display:flex;flex-direction:column;justify-content:safe center;gap:clamp(16px,2.6vh,34px);padding:2vh 0}
+.q-tag{font-size:clamp(1rem,1.6vw,1.5rem)}
+.q-text{font-size:calc(var(--qscale) * clamp(1.5rem,3.1vw,3.3rem));line-height:1.3;font-weight:700}
+.answer{padding:clamp(16px,2vw,28px) clamp(20px,2.4vw,34px)}
+.answer h3{font-size:calc(var(--qscale) * clamp(1.4rem,2.7vw,2.8rem))}
+.answer p{font-size:calc(var(--qscale) * clamp(1.1rem,2vw,2rem))}
+table{font-size:calc(var(--qscale) * clamp(1rem,1.8vw,1.8rem))}
+th,td{padding:.4em .8em}
+.media svg{width:min(100%,calc(var(--qscale) * 560px))}
+#revealBtn{font-size:clamp(1rem,1.4vw,1.3rem);padding:12px 22px}
+.sizeBtns .btn{min-width:52px;font-size:1.05rem}
+</style>
 </body>
 </html>
