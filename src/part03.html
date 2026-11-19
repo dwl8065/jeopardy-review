@@ -1,0 +1,220 @@
+    ${field("Worked steps",`data-final="steps"`,f.steps,3,"One step per line.")}
+  </div></details>`;
+  $("catEditors").innerHTML=h;
+}
+function onEdit(e){
+  const el=e.target, d=el.dataset;
+  if(d.top){GAME[d.top]=el.value; renderTitle();}
+  else if(d.final){GAME.final[d.final]=el.value;}
+  else if(d.f){
+    const c=GAME.cats[+d.c];
+    if(d.r===undefined){c[d.f]=el.value; if(d.f==="name"){const s=document.querySelector(`[data-sum="${d.c}"]`); if(s) s.textContent=el.value;}}
+    else{
+      const q=c.qs[+d.r];
+      if(["q","a","steps"].includes(d.f)) q[d.f]=el.value;
+      else{
+        q.table[d.f]=el.type==="checkbox"?el.checked:el.value;
+        if(d.f==="on") document.querySelector(`[data-tbl="${d.c}-${d.r}"]`).classList.toggle("off",!el.checked);
+        document.querySelector(`[data-warn="${d.c}-${d.r}"]`).textContent=tableWarn(q.table);
+      }
+    }
+  } else return;
+  saveGame(); setStatus("Saved in this browser");
+}
+
+$("editView").addEventListener("input",onEdit);
+$("editView").addEventListener("change",onEdit);
+let statusT=null;
+function setStatus(msg){$("status").textContent=msg;clearTimeout(statusT);statusT=setTimeout(()=>$("status").textContent="",3000);}
+// Full screen
+const isMac=/Mac/i.test(navigator.platform||navigator.userAgent);
+const fsKey=isMac?"Cmd + Ctrl + F":"F11";
+function fsActive(){return !!(document.fullscreenElement||document.webkitFullscreenElement);}
+function fsLabel(){$("fsBtn").textContent=fsActive()?"Exit full screen":"Full screen";}
+let fsHintT=null;
+function fsHint(){const b=$("fsBtn");b.textContent="Press "+fsKey+" for full screen";clearTimeout(fsHintT);fsHintT=setTimeout(fsLabel,5000);}
+$("fsBtn").onclick=async()=>{
+  try{
+    if(fsActive()){await (document.exitFullscreen||document.webkitExitFullscreen).call(document);}
+    else{
+      const el=document.documentElement, req=el.requestFullscreen||el.webkitRequestFullscreen;
+      if(!req||!(document.fullscreenEnabled||document.webkitFullscreenEnabled)){fsHint();return;}
+      await req.call(el);
+    }
+  }catch(e){fsHint();}
+};
+document.addEventListener("fullscreenchange",fsLabel);
+document.addEventListener("webkitfullscreenchange",fsLabel);
+
+
+
+// ---------- Small UI helpers ----------
+let toastT=null;
+function toast(msg){const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),3200);}
+function armClick(btn,armedText,fn){
+  if(btn.dataset.armed==="1"){btn.dataset.armed="";fn();return;}
+  const orig=btn.textContent; btn.dataset.armed="1"; btn.textContent=armedText; btn.classList.add("final");
+  setTimeout(()=>{if(btn.isConnected&&btn.dataset.armed==="1"){btn.dataset.armed="";btn.textContent=orig;btn.classList.remove("final");}},4000);
+}
+let dlgResolve=null;
+function ask(title,label,value,opts={}){
+  return new Promise(res=>{
+    dlgResolve=res;
+    $("dlgTitle").textContent=title; $("dlgLabel").textContent=label;
+    const inp=$("dlgInput"), sel=$("dlgSelect");
+    if(opts.choices){inp.style.display="none"; sel.style.display=""; sel.innerHTML=opts.choices.map(c=>`<option value="${esc(c.value)}">${esc(c.label)}</option>`).join("");}
+    else{sel.style.display="none"; inp.style.display=""; inp.value=value||""; inp.placeholder=opts.placeholder||"";}
+    $("dlgOk").textContent=opts.ok||"OK";
+    $("dlg").classList.add("open");
+    setTimeout(()=>(opts.choices?sel:inp).focus(),30);
+  });
+}
+function closeDlg(val){$("dlg").classList.remove("open"); if(dlgResolve){const r=dlgResolve; dlgResolve=null; r(val);}}
+$("dlgCancel").onclick=()=>closeDlg(null);
+$("dlgOk").onclick=()=>{const v=$("dlgInput").style.display==="none"?$("dlgSelect").value:$("dlgInput").value.trim(); closeDlg(v||null);};
+$("dlgInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("dlgOk").click();} if(e.key==="Escape") closeDlg(null);});
+const fmtDate=ts=>new Date(ts).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
+const fileName=t=>((t||"jeopardy-game").replace(/[^A-Za-z0-9 _-]+/g,"").trim().replace(/\s+/g,"-")||"jeopardy-game")+".json";
+function downloadJSON(obj,name){
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:"application/json"})); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),3000); toast("Downloaded "+name);
+}
+
+// ---------- Views ----------
+function showView(v){
+  view=v;
+  ["lib","play","edit"].forEach(k=>$(k+"View").classList.toggle("hidden",k!==v));
+  $("libTools").classList.toggle("hidden",v!=="lib");
+  $("playTools").classList.toggle("hidden",v!=="play");
+  renderTitle(); window.scrollTo(0,0);
+}
+function openGame(id,mode){
+  const f=findEntry(id); if(!f) return;
+  ENTRY=f.e; GAME=ENTRY.game; S=loadPlay(id); nav.c=f.c.id; nav.u=f.u.id;
+  if(mode==="edit") openEditor("lib"); else {showView("play"); renderBoard(); renderScores();}
+}
+function openEditor(ret){editReturn=ret; renderEditor(); showView("edit");}
+function goLib(){stopTimer(); ENTRY=null; GAME=null; S=null; showView("lib"); renderLib();}
+$("libBtn").onclick=goLib;
+$("editBtn").onclick=()=>openEditor("play");
+$("doneBtn").onclick=()=>{saveLib(true); if(editReturn==="play"){showView("play");renderBoard();renderScores();} else goLib();};
+$("playFromEdit").onclick=()=>{saveLib(true); showView("play"); renderBoard(); renderScores();};
+$("saveFileBtn").onclick=()=>downloadJSON(GAME,fileName(GAME.title));
+$("blankBtn").onclick=e=>armClick(e.currentTarget,"Tap again to erase every question",()=>{
+  const b=blankGame(); b.title=GAME.title; b.subtitle=GAME.subtitle; Object.assign(GAME,b); saveGame(); S=freshState(S.teams.map(t=>t.name)); save(); renderEditor(); setStatus("All questions erased");
+});
+
+// ---------- Library ----------
+const plural=(n,w)=>`${n} ${w}${n===1?"":"s"}`;
+function renderLib(){
+  const c=findCourse(nav.c); if(!c){nav.c=null;nav.u=null;}
+  const u=findUnit(c,nav.u); if(!u) nav.u=null;
+  let h=`<nav class="crumbs" aria-label="Library path"><button data-go="root">All courses</button>`;
+  if(c) h+=`<span>›</span><button data-go="course">${esc(c.name)}</button>`;
+  if(u) h+=`<span>›</span><span>${esc(u.name)}</span>`;
+  h+=`</nav>`;
+  if(!c){
+    h+=`<div class="lib-head"><h2>Courses</h2><button class="btn solid" data-act="newCourse">New course</button></div><div class="cards">`;
+    LIB.courses.forEach(x=>{const n=x.units.reduce((s,y)=>s+y.games.length,0); h+=`<button class="card" data-course="${x.id}"><b>${esc(x.name)}</b><span>${plural(x.units.length,"book")} · ${plural(n,"game")}</span></button>`;});
+    h+=`<button class="card add" data-act="newCourse">+ New course</button></div>`;
+    h+=`<div class="lib-foot"><button class="btn" data-act="backup">Back up everything</button><button class="btn" data-act="restore">Restore a backup</button><span class="note">Your library is saved on this device. Back it up to Google Drive now and then.</span></div>`;
+  } else if(!u){
+    h+=`<div class="lib-head"><h2>${esc(c.name)}</h2><div class="tools"><button class="btn solid" data-act="newUnit">New book / unit</button><button class="btn" data-act="renameCourse">Rename</button><button class="btn" data-act="delCourse">Delete course</button></div></div><div class="cards">`;
+    c.units.forEach(x=>h+=`<button class="card" data-unit="${x.id}"><b>${esc(x.name)}</b><span>${plural(x.games.length,"game")}</span></button>`);
+    h+=`<button class="card add" data-act="newUnit">+ New book / unit</button></div>`;
+  } else {
+    h+=`<div class="lib-head"><h2>${esc(u.name)}</h2><div class="tools"><button class="btn solid" data-act="newGame">New game</button><button class="btn" data-act="importGame">Import game file</button><button class="btn" data-act="renameUnit">Rename</button><button class="btn" data-act="delUnit">Delete book / unit</button></div></div>`;
+    if(!u.games.length) h+=`<p class="empty">No games here yet. Tap <b>New game</b> to write one, or <b>Import game file</b> to add a saved .json game.</p>`;
+    else{
+      h+=`<div class="games">`;
+      u.games.forEach(g=>{h+=`<div class="game-row"><div class="meta"><b>${esc(g.game.title||"Untitled game")}</b><span>${g.game.subtitle?esc(g.game.subtitle)+" · ":""}Edited ${fmtDate(g.updated)}</span></div>
+        <div class="tools"><button class="btn solid" data-play="${g.id}">Play</button><button class="btn" data-edit="${g.id}">Edit</button><button class="btn" data-dl="${g.id}">Download</button><button class="btn" data-dup="${g.id}">Duplicate</button><button class="btn" data-move="${g.id}">Move</button><button class="btn" data-del="${g.id}">Delete</button></div></div>`;});
+      h+=`</div>`;
+    }
+  }
+  $("libView").innerHTML=h;
+}
+$("libView").onclick=async e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  const d=b.dataset, c=findCourse(nav.c), u=findUnit(c,nav.u);
+  if(d.go){if(d.go==="root"){nav.c=null;nav.u=null;} else nav.u=null; renderLib(); return;}
+  if(d.course){nav.c=d.course;nav.u=null;renderLib();return;}
+  if(d.unit){nav.u=d.unit;renderLib();return;}
+  if(d.play) return openGame(d.play,"play");
+  if(d.edit) return openGame(d.edit,"edit");
+  if(d.dl){const f=findEntry(d.dl); return downloadJSON(f.e.game,fileName(f.e.game.title));}
+  if(d.dup){const f=findEntry(d.dup); const copy=JSON.parse(JSON.stringify(f.e.game)); copy.title=(copy.title||"Game")+" (copy)";
+    f.u.games.splice(f.u.games.indexOf(f.e)+1,0,{id:uid(),updated:Date.now(),game:copy}); saveLib(true); renderLib(); toast("Game duplicated"); return;}
+  if(d.move){
+    const f=findEntry(d.move), choices=[];
+    LIB.courses.forEach(x=>x.units.forEach(y=>{if(y!==f.u) choices.push({value:x.id+"|"+y.id,label:x.name+" › "+y.name});}));
+    if(!choices.length){toast("Make another book / unit first, then move the game there.");return;}
+    const v=await ask("Move game","Move “"+(f.e.game.title||"this game")+"” to:","",{choices,ok:"Move"}); if(!v) return;
+    const [ci,ui]=v.split("|"), dest=findUnit(findCourse(ci),ui);
+    f.u.games=f.u.games.filter(g=>g!==f.e); dest.games.push(f.e); saveLib(true); renderLib(); toast("Moved to "+dest.name); return;
+  }
+  if(d.del) return armClick(b,"Tap again to delete",()=>{
+    const f=findEntry(d.del); f.u.games=f.u.games.filter(g=>g!==f.e); try{localStorage.removeItem("jq-play-"+d.del)}catch(err){}
+    saveLib(true); renderLib(); toast("Game deleted");
+  });
+  switch(d.act){
+    case "newCourse":{const n=await ask("New course","Course name","",{placeholder:"e.g., Business Math"}); if(n){const x={id:uid(),name:n,units:[]}; LIB.courses.push(x); nav.c=x.id; nav.u=null; saveLib(true); renderLib();} break;}
+    case "renameCourse":{const n=await ask("Rename course","Course name",c.name); if(n){c.name=n; saveLib(true); renderLib();} break;}
+    case "delCourse": armClick(b,"Tap again: deletes the course and all its games",()=>{LIB.courses=LIB.courses.filter(x=>x!==c); nav.c=null; saveLib(true); renderLib(); toast("Course deleted");}); break;
+    case "newUnit":{const n=await ask("New book / unit","Name","",{placeholder:"e.g., Book 9: Linear Equations"}); if(n){const x={id:uid(),name:n,games:[]}; c.units.push(x); nav.u=x.id; saveLib(true); renderLib();} break;}
+    case "renameUnit":{const n=await ask("Rename book / unit","Name",u.name); if(n){u.name=n; saveLib(true); renderLib();} break;}
+    case "delUnit": armClick(b,"Tap again: deletes this book and its games",()=>{c.units=c.units.filter(x=>x!==u); nav.u=null; saveLib(true); renderLib(); toast("Book / unit deleted");}); break;
+    case "newGame":{const n=await ask("New game","Game title","",{placeholder:"e.g., Lessons 1–5 Review"}); if(n){const g=blankGame(); g.title=n; g.subtitle=c.name+" · "+u.name; const x={id:uid(),updated:Date.now(),game:g}; u.games.push(x); saveLib(true); openGame(x.id,"edit");} break;}
+    case "importGame": $("fileInput").dataset.kind="game"; $("fileInput").click(); break;
+    case "backup": downloadJSON({jeopardyLibrary:1,exported:new Date().toISOString(),courses:LIB.courses},"jeopardy-library-backup-"+new Date().toISOString().slice(0,10)+".json"); break;
+    case "restore": $("fileInput").dataset.kind="backup"; $("fileInput").click(); break;
+  }
+};
+$("fileInput").onchange=e=>{
+  const file=e.target.files[0], kind=e.target.dataset.kind; e.target.value=""; if(!file) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    let obj=null; try{obj=JSON.parse(rd.result)}catch(err){}
+    if(obj&&Array.isArray(obj.courses)){ // library backup: merge by name, never overwrite
+      let added=0;
+      obj.courses.forEach(sc=>{
+        let c=LIB.courses.find(x=>x.name===sc.name); if(!c){c={id:uid(),name:str(sc.name)||"Course",units:[]}; LIB.courses.push(c);}
+        (sc.units||[]).forEach(su=>{
+          let u=c.units.find(x=>x.name===su.name); if(!u){u={id:uid(),name:str(su.name)||"Book",games:[]}; c.units.push(u);}
+          (su.games||[]).forEach(sg=>{const g=normalize(sg.game); if(g){u.games.push({id:uid(),updated:sg.updated||Date.now(),game:g}); added++;}});
+        });
+      });
+      saveLib(true); renderLib(); toast(`Restored ${plural(added,"game")}`); return;
+    }
+    const g=normalize(obj);
+    if(!g){toast("That file isn’t a Jeopardy game or backup file.");return;}
+    const c=findCourse(nav.c), u=findUnit(c,nav.u);
+    if(!u){toast("Open a book / unit first, then import the game there.");return;}
+    u.games.push({id:uid(),updated:Date.now(),game:g}); saveLib(true); renderLib(); toast("Imported “"+(g.title||file.name)+"”");
+  };
+  rd.readAsText(file);
+};
+
+// ---------- Play toolbar ----------
+$("addTeam").onclick=()=>{if(S.teams.length<8){S.teams.push({name:"Team "+(S.teams.length+1),score:0});save();renderScores();}};
+$("removeTeam").onclick=()=>{if(S.teams.length>1){S.teams.pop();save();renderScores();}};
+$("resetBtn").onclick=e=>armClick(e.currentTarget,"Tap again to clear scores",()=>{S=freshState(S.teams.map(t=>t.name)); save(); renderBoard(); renderScores();});
+function soundLabel(){document.querySelectorAll(".soundBtn").forEach(b=>b.textContent="Sound: "+(soundOn?"on":"off"));}
+document.querySelectorAll(".soundBtn").forEach(b=>b.onclick=()=>{soundOn=!soundOn; if(!soundOn) stopMusic(); try{localStorage.setItem(KEY+"-sound",soundOn?"on":"off")}catch(e){} soundLabel();});
+document.querySelectorAll(".themeBtn").forEach(b=>b.onclick=()=>{
+  const r=document.documentElement, dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme=dark?"light":"dark"; try{localStorage.setItem(KEY+"-theme",r.dataset.theme)}catch(e){}
+});
+
+// ---------- Install + offline ----------
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault(); deferredPrompt=e; $("installBtn").classList.remove("hidden");});
+window.addEventListener("appinstalled",()=>{$("installBtn").classList.add("hidden"); toast("Installed! Open it from your home screen.");});
+$("installBtn").onclick=async()=>{if(!deferredPrompt) return; deferredPrompt.prompt(); try{await deferredPrompt.userChoice}catch(e){} deferredPrompt=null; $("installBtn").classList.add("hidden");};
+if("serviceWorker" in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register("./sw.js").catch(()=>{});
+if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+
+soundLabel(); showView("lib"); renderLib();
+</script>
+</body>
+</html>
