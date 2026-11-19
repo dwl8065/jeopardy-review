@@ -198,7 +198,7 @@ $("fileInput").onchange=e=>{
 // ---------- Play toolbar ----------
 $("addTeam").onclick=()=>{if(S.teams.length<8){S.teams.push({name:"Team "+(S.teams.length+1),score:0});save();renderScores();}};
 $("removeTeam").onclick=()=>{if(S.teams.length>1){S.teams.pop();save();renderScores();}};
-$("resetBtn").onclick=e=>armClick(e.currentTarget,"Tap again to clear scores",()=>{S=freshState(S.teams.map(t=>t.name)); save(); renderBoard(); renderScores();});
+$("resetBtn").onclick=e=>armClick(e.currentTarget,"Tap again to clear scores and names",()=>{S=freshState(S.teams.map((t,i)=>"Team "+(i+1))); save(); renderBoard(); renderScores();});
 function soundLabel(){document.querySelectorAll(".soundBtn").forEach(b=>b.textContent="Sound: "+(soundOn?"on":"off"));}
 document.querySelectorAll(".soundBtn").forEach(b=>b.onclick=()=>{soundOn=!soundOn; if(!soundOn) stopMusic(); try{localStorage.setItem(KEY+"-sound",soundOn?"on":"off")}catch(e){} soundLabel();});
 document.querySelectorAll(".themeBtn").forEach(b=>b.onclick=()=>{
