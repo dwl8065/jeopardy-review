@@ -1,0 +1,262 @@
+  if(view==="lib"||!GAME){$("gTitle").innerHTML=`Jeopardy Review<small>Your game library</small>`; document.title="Jeopardy Review"; return;}
+  $("gTitle").innerHTML=`${esc(GAME.title||"Review Jeopardy")}<small>${esc(GAME.subtitle)}</small>`;
+  document.title=GAME.title||"Jeopardy Review";
+}
+function renderBoard(){
+  renderTitle();
+  const b=$("board"); b.innerHTML="";
+  GAME.cats.forEach(c=>{const d=document.createElement("div");d.className="cat";d.innerHTML=`${esc(c.name)}<span>${esc(c.lesson)}</span>`;b.appendChild(d);});
+  for(let r=0;r<5;r++) GAME.cats.forEach((c,ci)=>{
+    const id=ci+"-"+r, t=document.createElement("button");
+    t.className="tile"+(S.used[id]?" used":""); t.textContent=VALUES[r];
+    t.setAttribute("aria-label",`${c.name} for ${VALUES[r]}${S.used[id]?", already played":""}`);
+    t.onclick=()=>{
+      if(S.used[id]){
+        if(t.dataset.arm!=="1"){
+          t.dataset.arm="1"; t.textContent="Click again to reopen"; t.style.fontSize="clamp(.75rem,1.3vw,1.1rem)"; t.style.opacity="1";
+          setTimeout(()=>{if(t.isConnected&&t.dataset.arm==="1"){t.dataset.arm="";t.textContent=VALUES[r];t.style.fontSize="";t.style.opacity="";}},3000);
+          return;
+        }
+        delete S.used[id]; save();
+      }
+      openQ(ci,r);
+    };
+    b.appendChild(t);
+  });
+}
+function renderScores(){
+  const s=$("scores"); s.innerHTML="";
+  S.teams.forEach(t=>{
+    const d=document.createElement("div"); d.className="team";
+    d.innerHTML=`<input aria-label="Team name" value="${esc(t.name)}"><div class="score ${t.score<0?"neg":""}">${t.score}</div>
+      <div class="adj"><button aria-label="Subtract 100">−100</button><button aria-label="Add 100">+100</button></div>`;
+    d.querySelector("input").oninput=e=>{t.name=e.target.value;save();};
+    const [m,p]=d.querySelectorAll(".adj button");
+    m.onclick=()=>{t.score-=100;save();renderScores();}; p.onclick=()=>{t.score+=100;save();renderScores();};
+    s.appendChild(d);
+  });
+}
+const splitVals=s=>String(s||"").split(",").map(v=>v.trim()).filter(v=>v!=="");
+function tableHTML(t){
+  const x=splitVals(t.x), y=splitVals(t.y);
+  return `<div class="tbl-wrap"><table><tr><th scope="row">${esc(t.xLabel)}</th>${x.map(v=>`<td>${esc(v)}</td>`).join("")}</tr>
+  <tr><th scope="row">${esc(t.yLabel)}</th>${y.map(v=>`<td>${esc(v)}</td>`).join("")}</tr></table></div>`;
+}
+function niceStep(range){const raw=range/8||1, p=Math.pow(10,Math.floor(Math.log10(raw))), m=raw/p; return (m<=1?1:m<=2?2:m<=5?5:10)*p;}
+const fmt=v=>String(+v.toFixed(4));
+function graphSVG(t){
+  const xs=splitVals(t.x).map(Number), ys=splitVals(t.y).map(Number);
+  if(xs.length<2||xs.length!==ys.length||xs.some(isNaN)||ys.some(isNaN)) return "";
+  const xstep=niceStep(Math.max(...xs,0)-Math.min(...xs,0)), ystep=niceStep(Math.max(...ys,0)-Math.min(...ys,0));
+  const xmin=Math.floor(Math.min(0,...xs)/xstep)*xstep, xmax=Math.ceil(Math.max(0,...xs)/xstep)*xstep||xstep;
+  const ymin=Math.floor(Math.min(0,...ys)/ystep)*ystep, ymax=Math.ceil(Math.max(0,...ys)*1.05/ystep)*ystep||ystep;
+  const W=520,H=360,L=62,R=18,Tp=18,B=54,pw=W-L-R,ph=H-Tp-B;
+  const X=x=>L+(x-xmin)/(xmax-xmin)*pw, Y=y=>Tp+ph-(y-ymin)/(ymax-ymin)*ph;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Graph of ${esc(t.yLabel)} versus ${esc(t.xLabel)}">`;
+  for(let x=xmin;x<=xmax+1e-9;x+=xstep) s+=`<line x1="${X(x)}" y1="${Tp}" x2="${X(x)}" y2="${Tp+ph}" stroke="var(--grid-strong)"/><text x="${X(x)}" y="${Tp+ph+20}" font-size="14" text-anchor="middle" fill="var(--ink-soft)">${fmt(x)}</text>`;
+  for(let y=ymin;y<=ymax+1e-9;y+=ystep) s+=`<line x1="${L}" y1="${Y(y)}" x2="${L+pw}" y2="${Y(y)}" stroke="var(--grid-strong)"/><text x="${L-8}" y="${Y(y)+5}" font-size="14" text-anchor="end" fill="var(--ink-soft)">${fmt(y)}</text>`;
+  s+=`<line x1="${L}" y1="${Y(0)}" x2="${L+pw}" y2="${Y(0)}" stroke="var(--ink)" stroke-width="2"/><line x1="${X(0)}" y1="${Tp}" x2="${X(0)}" y2="${Tp+ph}" stroke="var(--ink)" stroke-width="2"/>`;
+  s+=`<text x="${L+pw/2}" y="${H-8}" font-size="15" text-anchor="middle" fill="var(--ink)">${esc(t.xLabel)}</text>`;
+  s+=`<text transform="translate(16 ${Tp+ph/2}) rotate(-90)" font-size="15" text-anchor="middle" fill="var(--ink)">${esc(t.yLabel)}</text>`;
+  const pts=xs.map((x,i)=>[x,ys[i]]);
+  s+=`<polyline fill="none" stroke="var(--accent)" stroke-width="3.5" stroke-linejoin="round" points="${pts.map(p=>X(p[0])+","+Y(p[1])).join(" ")}"/>`;
+  pts.forEach(p=>s+=`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="5" fill="var(--accent)"/>`);
+  return s+"</svg>";
+}
+
+
+// ---------- Question flow ----------
+let cur=null, timerId=null;
+function show(stage){["ddStage","finalStage","qStage"].forEach(s=>$(s).classList.toggle("hidden",s!==stage));}
+function fillQuestion(item){
+  $("qText").textContent=item.q||"(No question written yet. Add one with Edit questions.)";
+  let m=""; if(item.table&&item.table.on){m+=tableHTML(item.table); if(item.table.graph) m+=graphSVG(item.table);}
+  $("qMedia").innerHTML=m;
+  const steps=String(item.steps||"").split("\n").map(s=>s.trim()).filter(Boolean);
+  const a=$("answer"); a.classList.remove("show");
+  a.innerHTML=`<h3>${esc(item.a||"(No answer written yet)")}</h3>${steps.map(e=>`<p>${esc(e)}</p>`).join("")}`;
+  $("award").classList.remove("show"); $("revealBtn").classList.remove("hidden");
+}
+function openQ(ci,r){
+  const id=ci+"-"+r, isDD=S.dd.includes(id), c=GAME.cats[ci];
+  cur={ci,r,id,value:VALUES[r],dd:isDD,final:false};
+  $("qTag").innerHTML=`${esc(c.name)}<b>${isDD?"Daily Double":VALUES[r]}</b>`;
+  stopTimer(); fillQuestion(c.qs[r]);
+  if(isDD){$("ddTeam").innerHTML=S.teams.map((t,i)=>`<option value="${i}">${esc(t.name)}</option>`).join(""); updateDDNote(); show("ddStage");}
+  else show("qStage");
+  $("overlay").classList.add("open"); $("overlay").focus();
+}
+function maxWager(t){return Math.max(t.score,500);}
+function updateDDNote(){const t=S.teams[+$("ddTeam").value];$("ddNote").textContent=`${t.name} can wager up to ${maxWager(t)} points.`;}
+$("ddTeam").onchange=updateDDNote;
+$("ddGo").onclick=()=>{
+  const ti=+$("ddTeam").value, t=S.teams[ti];
+  let w=Math.round(+$("ddWager").value||0); w=Math.max(0,Math.min(w,maxWager(t)));
+  cur.ddTeam=ti; cur.value=w; $("qTag").innerHTML=`${esc(GAME.cats[cur.ci].name)}<b>Daily Double: ${esc(t.name)} wagers ${w}</b>`;
+  show("qStage");
+};
+function reveal(){
+  if(!cur||$("qStage").classList.contains("hidden")) return;
+  $("answer").classList.add("show"); $("revealBtn").classList.add("hidden"); stopTimer(); buildAward();
+}
+$("revealBtn").onclick=reveal;
+function buildAward(){
+  const aw=$("award"); aw.innerHTML=`<p class="note">${cur.final?"Mark each team, then go back to the board.":"Mark who answered. Points are applied right away; click again to undo."}</p>`;
+  const teams=cur.dd?[cur.ddTeam]:S.teams.map((_,i)=>i);
+  cur.applied=cur.applied||{};
+  teams.forEach(i=>{
+    const t=S.teams[i], val=cur.final?(cur.wagers[i]||0):cur.value;
+    const row=document.createElement("div"); row.className="teamrow";
+    row.innerHTML=`<strong>${esc(t.name)}</strong><button class="yes">Correct +${val}</button><button class="no">Wrong −${val}</button>`;
+    const [y,n]=row.querySelectorAll("button");
+    const set=k=>{const prev=cur.applied[i]||0; t.score-=prev; const next=(prev===k*val&&val!==0)?0:k*val; t.score+=next; cur.applied[i]=next;
+      y.classList.toggle("picked",next>0); n.classList.toggle("picked",next<0); save(); renderScores();};
+    y.onclick=()=>set(1); n.onclick=()=>set(-1);
+    aw.appendChild(row);
+  });
+  aw.classList.add("show");
+}
+function closeQ(){
+  if(cur&&!cur.final&&$("answer").classList.contains("show")){S.used[cur.id]=true;save();}
+  stopTimer(); $("overlay").classList.remove("open"); cur=null; renderBoard();
+}
+$("closeBtn").onclick=closeQ;
+
+$("finalBtn").onclick=()=>{
+  cur={final:true,wagers:{},applied:{}};
+  $("qTag").innerHTML=`Final Jeopardy<b>${esc(GAME.final.cat)}</b>`;
+  $("finalCat").textContent=GAME.final.cat?"Category: "+GAME.final.cat:"";
+  stopTimer(); fillQuestion(GAME.final);
+  $("finalWagers").innerHTML=S.teams.map((t,i)=>`<div class="teamrow wager"><strong>${esc(t.name)}</strong><label for="fw${i}">Wager (0–${Math.max(0,t.score)})</label><input id="fw${i}" type="number" min="0" step="100" value="0"></div>`).join("");
+  show("finalStage"); $("overlay").classList.add("open"); $("overlay").focus();
+};
+$("finalGo").onclick=()=>{
+  S.teams.forEach((t,i)=>{let w=Math.round(+$("fw"+i).value||0);cur.wagers[i]=Math.max(0,Math.min(w,Math.max(0,t.score)));});
+  TSET.f=readSecs("finalSecs",60); saveT();
+  show("qStage"); startTimer(TSET.f);
+};
+
+
+// ---------- Sound + timers ----------
+let actx=null, musicTimer=null, soundOn=true;
+try{soundOn=localStorage.getItem(KEY+"-sound")!=="off"}catch(e){}
+function ac(){if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==="suspended") actx.resume(); return actx;}
+function tone(f,t,d,type,vol){const a=ac(),o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.01);g.gain.exponentialRampToValueAtTime(0.0001,t+d);o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+d+0.05);}
+const N=n=>440*Math.pow(2,(n-69)/12);
+// Upbeat original game-show countdown: bouncy bass, bright bells, speeds up in the last 5 seconds
+const MEL=[72,0,76,79,0,76,0,72, 74,0,77,81,0,77,0,74, 76,79,84,0,81,79,76,0, 79,0,74,0,72,0,0,0];
+const BASS=[[48,55],[50,57],[45,52],[43,50]];
+let musicFast=false;
+function startMusic(){
+  if(!soundOn) return; stopMusic();
+  const a=ac(); let next=a.currentTime+0.05, step=0;
+  musicTimer=setInterval(()=>{
+    while(next<a.currentTime+0.2){
+      if(step%2) tone(musicFast?4200:3200,next,0.025,"square",musicFast?0.05:0.025);
+      else tone(musicFast?2600:2000,next,0.02,"square",0.02);
+      if(MEL[step]){const m=MEL[step]+(musicFast?2:0); tone(N(m),next,0.18,"triangle",0.11); tone(N(m+12),next,0.12,"sine",0.05);}
+      if(step%2===0) tone(N(BASS[Math.floor(step/8)][(step%4)/2]),next,0.18,"sine",0.22);
+      next+=musicFast?0.14:0.19; step=(step+1)%32;
+    }
+  },40);
+}
+function stopMusic(){clearInterval(musicTimer);musicTimer=null;musicFast=false;}
+function buzzer(){if(!soundOn) return; const t=ac().currentTime; tone(110,t,0.9,"sawtooth",0.14); tone(116,t,0.9,"sawtooth",0.1);}
+let timerLeft=0, timerLen=0;
+function timerLabel(){
+  $("timerBtn").textContent=timerId?"Pause":(timerLeft>0&&timerLeft<timerLen?"Resume":"Start timer");
+}
+function stopTimer(){clearInterval(timerId);timerId=null;stopMusic();timerLeft=0;timerLen=0;$("timer").textContent="";$("timer").classList.remove("low");timerLabel();}
+function pauseTimer(){clearInterval(timerId);timerId=null;stopMusic();timerLabel();}
+function runTimer(){
+  if(timerLeft<=0) return;
+  musicFast=timerLeft<=5; startMusic(); musicFast=timerLeft<=5;
+  const el=$("timer");
+  timerId=setInterval(()=>{
+    timerLeft--; el.textContent=timerLeft>0?timerLeft:"Time!"; el.classList.toggle("low",timerLeft<=5); musicFast=timerLeft<=5;
+    if(timerLeft<=0){clearInterval(timerId);timerId=null;stopMusic();buzzer();timerLabel();}
+  },1000);
+  timerLabel();
+}
+function startTimer(sec){
+  stopTimer(); timerLen=sec; timerLeft=sec; $("timer").textContent=sec; runTimer();
+}
+function resetTimer(){
+  const len=timerLen||readSecs("timerSecs",30);
+  pauseTimer(); timerLen=len; timerLeft=len;
+  $("timer").textContent=len; $("timer").classList.remove("low"); timerLabel();
+}
+let TSET={q:30,f:60};
+try{Object.assign(TSET,JSON.parse(localStorage.getItem(KEY+"-timers"))||{})}catch(e){}
+function saveT(){try{localStorage.setItem(KEY+"-timers",JSON.stringify(TSET))}catch(e){}}
+function readSecs(id,def){let v=Math.round(+$(id).value); if(!(v>=5)) v=def; v=Math.min(v,600); $(id).value=v; return v;}
+$("timerSecs").value=TSET.q; $("finalSecs").value=TSET.f;
+function applyTimerBox(v){
+  TSET.q=v; saveT(); timerLen=v;
+  if(!timerId){timerLeft=v; $("timer").textContent=v; $("timer").classList.toggle("low",v<=5); timerLabel();}
+}
+$("timerSecs").addEventListener("input",()=>{
+  const v=Math.round(+$("timerSecs").value);
+  if(v>=5&&v<=600) applyTimerBox(v);
+});
+$("timerSecs").onchange=()=>applyTimerBox(readSecs("timerSecs",30));
+$("finalSecs").onchange=()=>{TSET.f=readSecs("finalSecs",60);saveT();};
+$("timerBtn").onclick=()=>{
+  if(timerId){pauseTimer();return;}
+  if(timerLeft>0){runTimer();return;}
+  TSET.q=readSecs("timerSecs",30);saveT();startTimer(TSET.q);
+};
+$("timerReset").onclick=resetTimer;
+
+// Keys
+document.addEventListener("keydown",e=>{
+  if(!$("overlay").classList.contains("open")) return;
+  if(e.key==="Escape") closeQ();
+  if(e.key===" " && !["INPUT","SELECT","BUTTON"].includes(document.activeElement.tagName)){e.preventDefault();reveal();}
+});
+
+
+
+// ---------- Editor ----------
+function field(label,attrs,val,multi,hint){
+  return `<label class="field">${label}${hint?` <small>${hint}</small>`:""}${multi
+    ?`<textarea ${attrs} rows="${multi}">${esc(val)}</textarea>`
+    :`<input type="text" ${attrs} value="${esc(val)}">`}</label>`;
+}
+function tableWarn(t){
+  if(!t.on) return "";
+  const x=splitVals(t.x), y=splitVals(t.y);
+  if(x.length!==y.length) return `The top row has ${x.length} values and the bottom row has ${y.length}. They should match.`;
+  if(t.graph&&(x.some(v=>isNaN(+v))||y.some(v=>isNaN(+v)))) return "The graph needs plain numbers in both rows (no letters or fractions like 1/2).";
+  return "";
+}
+function renderEditor(){
+  document.querySelectorAll("[data-top]").forEach(el=>el.value=GAME[el.dataset.top]||"");
+  let h="";
+  GAME.cats.forEach((c,ci)=>{
+    h+=`<details class="cat-ed"${ci===0?" open":""}><summary><span data-sum="${ci}">${esc(c.name)}</span></summary><div class="cat-body">
+      <div class="ed-grid">${field("Category name",`data-c="${ci}" data-f="name"`,c.name)}${field("Small label under the name",`data-c="${ci}" data-f="lesson"`,c.lesson,0,"e.g., Lesson 6")}</div>`;
+    c.qs.forEach((q,r)=>{
+      const a=`data-c="${ci}" data-r="${r}"`, t=q.table;
+      h+=`<div class="qcard"><h4>${VALUES[r]}</h4>
+        ${field("Question",`${a} data-f="q"`,q.q,3,"Make it stand alone; questions are played in any order.")}
+        ${field("Answer",`${a} data-f="a"`,q.a)}
+        ${field("Worked steps",`${a} data-f="steps"`,q.steps,3,"One step per line.")}
+        <label class="check"><input type="checkbox" ${a} data-f="on" ${t.on?"checked":""}> Show a table with this question</label>
+        <div class="tbl-fields${t.on?"":" off"}" data-tbl="${ci}-${r}">
+          ${field("Top row label",`${a} data-f="xLabel"`,t.xLabel,0,"e.g., t (seconds)")}
+          ${field("Top row values",`${a} data-f="x"`,t.x,0,"Separate with commas")}
+          ${field("Bottom row label",`${a} data-f="yLabel"`,t.yLabel,0,"e.g., H(t) (meters)")}
+          ${field("Bottom row values",`${a} data-f="y"`,t.y,0,"Separate with commas")}
+          <label class="check"><input type="checkbox" ${a} data-f="graph" ${t.graph?"checked":""}> Also draw a graph (connects the points in order)</label>
+        </div>
+        <p class="warn" data-warn="${ci}-${r}">${esc(tableWarn(t))}</p>
+      </div>`;
+    });
+    h+=`</div></details>`;
+  });
+  const f=GAME.final;
+  h+=`<details class="cat-ed"><summary><span>Final Jeopardy</span></summary><div class="cat-body">
+    ${field("Category",`data-final="cat"`,f.cat)}
+    ${field("Question",`data-final="q"`,f.q,3)}
+    ${field("Answer",`data-final="a"`,f.a)}
